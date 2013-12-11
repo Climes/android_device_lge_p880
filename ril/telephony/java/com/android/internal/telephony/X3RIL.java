@@ -127,7 +127,8 @@ public class X3RIL extends RIL implements CommandsInterface {
                 break;
         }
     }
-
+    
+    @Override
     protected RILRequest
     processSolicited (Parcel p) {
         int serial, error;
@@ -136,7 +137,7 @@ public class X3RIL extends RIL implements CommandsInterface {
         serial = p.readInt();
         error = p.readInt();
 
-        RILRequest rr = null;
+        RILRequest rr;
 
         /* Pre-process the reply before popping it */
         synchronized (mRequestList) {
@@ -150,12 +151,15 @@ public class X3RIL extends RIL implements CommandsInterface {
                                 rr = tr;
                                 break;
                         }} catch (Throwable thr) {
+                            Rlog.w(RILJ_LOG_TAG, tr.serialString() + "< "
+                            + requestToString(tr.mRequest)
+                            + " exception, possible invalid RIL response", thr);
                             // Exceptions here usually mean invalid RIL responses
-                            if (rr.mResult != null) {
-                                AsyncResult.forMessage(rr.mResult, null, thr);
-                                rr.mResult.sendToTarget();
+                            if (tr.mResult != null) {
+                                AsyncResult.forMessage(tr.mResult, null, thr);
+                                tr.mResult.sendToTarget();
                             }
-                            return rr;
+                            return tr;
                         }
                     } 
                 }
@@ -167,7 +171,7 @@ public class X3RIL extends RIL implements CommandsInterface {
             p.setDataPosition(dataPosition);
 
             // Forward responses that we are not overriding to the super class
-            super.processUnsolicited(p);
+            super.processSolicited(p);
         }
 
 
@@ -179,13 +183,13 @@ public class X3RIL extends RIL implements CommandsInterface {
 
         Object ret = null;
 
-        if (error == 0 || p.dataAvail() > 0) {
+        if (error == 0) {
             switch (rr.mRequest) {
                 case 0x113: ret =  responseVoid(p); break;
                 default:
                     throw new RuntimeException("Unrecognized solicited response: " + rr.mRequest);
             }
-            //break;
+            break;
         }
 
         switch (rr.mRequest) {
